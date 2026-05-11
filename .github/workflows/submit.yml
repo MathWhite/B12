@@ -1,56 +1,27 @@
-import json
-import hmac
-import hashlib
-import os
-from datetime import datetime, timezone
+name: Submit B12 Application
 
-import requests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
 
-SIGNING_SECRET = "hello-there-from-b12"
+jobs:
+  submit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-payload = {
-    "action_run_link": os.environ["ACTION_RUN_LINK"],
-    "email": "you@example.com",
-    "name": "Your Name",
-    "repository_link": "https://github.com/your-user/b12-application",
-    "resume_link": "https://linkedin.com/in/your-profile",
-    "timestamp": datetime.now(timezone.utc)
-        .isoformat(timespec="milliseconds")
-        .replace("+00:00", "Z"),
-}
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
 
-# Canonical JSON:
-# - compact separators
-# - sorted keys
-# - UTF-8 encoded
-body = json.dumps(
-    payload,
-    separators=(",", ":"),
-    sort_keys=True,
-    ensure_ascii=False,
-).encode("utf-8")
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
-signature = hmac.new(
-    SIGNING_SECRET.encode("utf-8"),
-    body,
-    hashlib.sha256,
-).hexdigest()
-
-headers = {
-    "Content-Type": "application/json",
-    "X-Signature-256": f"sha256={signature}",
-}
-
-response = requests.post(
-    "https://b12.io/apply/submission",
-    data=body,
-    headers=headers,
-    timeout=30,
-)
-
-response.raise_for_status()
-
-data = response.json()
-
-print("Submission successful!")
-print("Receipt:", data["receipt"])
+      - name: Submit application
+        env:
+          ACTION_RUN_LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python submit.py
